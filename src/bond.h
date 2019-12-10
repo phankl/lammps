@@ -28,6 +28,7 @@ class Bond : protected Pointers {
   int writedata;                  // 1 if writes coeffs to data file
   double energy;                  // accumulated energies
   double virial[6];               // accumulated virial
+  double **virial2;               // accumulated second order virial
   double *eatom,**vatom;          // accumulated per-atom energy/virial
 
   int reinitflag;                // 1 if compatible with fix adapt and alike
