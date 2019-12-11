@@ -118,6 +118,7 @@ Fix::~Fix()
 
   delete [] id;
   delete [] style;
+  memory->destroy(virial2);
   memory->destroy(eatom);
   memory->destroy(vatom);
 }
@@ -192,6 +193,8 @@ void Fix::ev_setup(int eflag, int vflag)
   vflag_global = vflag % 4;
   vflag_atom = vflag / 4;
 
+  memory->create(virial2,6,6,"fix:virial2");
+
   // reallocate per-atom arrays if necessary
 
   if (eflag_atom && atom->nlocal > maxeatom) {
@@ -248,6 +251,8 @@ void Fix::v_setup(int vflag)
 
   vflag_global = vflag % 4;
   vflag_atom = vflag / 4;
+
+  memory->create(virial2,6,6,"fix:virial2");
 
   // reallocate per-atom array if necessary
 

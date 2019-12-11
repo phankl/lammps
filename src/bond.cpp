@@ -57,6 +57,7 @@ Bond::~Bond()
 {
   if (copymode) return;
 
+  memory->destroy(virial2);
   memory->destroy(eatom);
   memory->destroy(vatom);
 }
@@ -92,6 +93,8 @@ void Bond::ev_setup(int eflag, int vflag, int alloc)
   vflag_either = vflag;
   vflag_global = vflag % 4;
   vflag_atom = vflag / 4;
+
+  memory->create(virial2,6,6,"bond:virial2");
 
   // reallocate per-atom arrays if necessary
 
