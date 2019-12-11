@@ -192,7 +192,85 @@ void ComputeElastic::compute_array()
   }
 
   // compute stiffness tensor in Voigt notation
+  
+  double e[6][6];
+  int i,j,k,l,m,n,p,delta;
+  for (i = 0; i < 6; i++) {
+    if (i == 0) {
+      k = 0;
+      l = 0;
+    }
+    else if (i == 1) {
+      k = 1;
+      l = 1;
+    }
+    else if (i == 2) {
+      k = 2;
+      l = 2;
+    }
+    else if (i == 3) {
+      k = 1;
+      l = 2;
+    }
+    else if (i == 4) {
+      k = 0;
+      l = 2;
+    }
+    else {
+      k = 0;
+      l = 1;
+    }
+    for (j = 0; j < 6; j++) {
+      if (j == 0) {
+        m = 0;
+        n = 0;
+      }
+      else if (j == 1) {
+        m = 1;
+        n = 1;
+      }
+      else if (j == 2) {
+        m = 2;
+        n = 2;
+      }
+      else if (j == 3) {
+        m = 1;
+        n = 2;
+      }
+      else if (j == 4) {
+        m = 0;
+        n = 2;
+      }
+      else {
+        m = 0;
+        n = 1;
+      }
 
+      if (l == n) delta = 1;
+      else delta = 0;
+
+      if (k == 0) {
+        if (m == 0) p = 0;
+	else if (m == 1) p = 3;
+	else p = 4;
+      }
+      else if (k == 1) {
+        if (m == 0) p = 3;
+	else if (m == 1) p = 1;
+	else p = 5;
+      }
+      else {
+        if (m == 0) p = 4;
+	else if (m == 1) p = 5;
+	else p = 3;
+      }
+
+      inv_volume = 1.0 / (domain->xprd * domain->yprd * domain->zprd);
+      e[i][j] = virial2[i][j]*inv_volume*nktv2p 
+	      + delta*pressure_tensor[p];
+    }
+
+  }
 }
 
 /* ---------------------------------------------------------------------- */
