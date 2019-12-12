@@ -97,6 +97,10 @@ Pair::Pair(LAMMPS *lmp) : Pointers(lmp)
   eatom = NULL;
   vatom = NULL;
 
+  // global second-order virial
+
+  memory->create(virial2,3,3,3,3,"pair:virial2");
+
   num_tally_compute = 0;
   list_tally_compute = NULL;
 
@@ -768,7 +772,7 @@ void Pair::del_tally_callback(Compute *ptr)
 
 void Pair::ev_setup(int eflag, int vflag, int alloc)
 {
-  int i,n;
+  int i,j,k,l,n;
 
   evflag = 1;
 
@@ -779,8 +783,6 @@ void Pair::ev_setup(int eflag, int vflag, int alloc)
   vflag_either = vflag;
   vflag_global = vflag % 4;
   vflag_atom = vflag / 4;
-
-  memory->create(virial2,6,6,"pair:virial2");
 
   // reallocate per-atom arrays if necessary
 
@@ -804,7 +806,14 @@ void Pair::ev_setup(int eflag, int vflag, int alloc)
   //   b/c some bonds/dihedrals call pair::ev_tally with pairwise info
 
   if (eflag_global) eng_vdwl = eng_coul = 0.0;
-  if (vflag_global) for (i = 0; i < 6; i++) virial[i] = 0.0;
+  if (vflag_global) {
+    for (i = 0; i < 6; i++) virial[i] = 0.0;
+    for (i = 0; i < 3; i++)
+      for (j = 0; j < 3; j++)
+        for (k = 0; k < 3; k++)
+	  for (l = 0; l < 3; l++)
+	    virial2[i][j][k][l] = 0.0;
+  }
   if (eflag_atom && alloc) {
     n = atom->nlocal;
     if (force->newton) n += atom->nghost;

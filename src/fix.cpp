@@ -34,7 +34,8 @@ int Fix::instance_total = 0;
 Fix::Fix(LAMMPS *lmp, int /*narg*/, char **arg) :
   Pointers(lmp),
   id(NULL), style(NULL), extlist(NULL), vector_atom(NULL), array_atom(NULL),
-  vector_local(NULL), array_local(NULL), eatom(NULL), vatom(NULL)
+  vector_local(NULL), array_local(NULL), eatom(NULL), vatom(NULL), 
+  virial2(NULL)
 {
   instance_me = instance_total++;
 
@@ -99,6 +100,10 @@ Fix::Fix(LAMMPS *lmp, int /*narg*/, char **arg) :
 
   maxeatom = maxvatom = 0;
   vflag_atom = 0;
+
+  // global second-order virial
+
+  memory->create(virial2,3,3,3,3,"fix:virial2");
 
   // KOKKOS per-fix data masks
 
@@ -181,7 +186,7 @@ void Fix::modify_params(int narg, char **arg)
 
 void Fix::ev_setup(int eflag, int vflag)
 {
-  int i,n;
+  int i,j,k,l,n;
 
   evflag = 1;
 
@@ -192,8 +197,6 @@ void Fix::ev_setup(int eflag, int vflag)
   vflag_either = vflag;
   vflag_global = vflag % 4;
   vflag_atom = vflag / 4;
-
-  memory->create(virial2,6,6,"fix:virial2");
 
   // reallocate per-atom arrays if necessary
 
@@ -212,7 +215,14 @@ void Fix::ev_setup(int eflag, int vflag)
   // no global energy variable to zero (unlike pair,bond,angle,etc)
   // fixes tally it individually via fix_modify energy yes and compute_scalar()
 
-  if (vflag_global) for (i = 0; i < 6; i++) virial[i] = 0.0;
+  if (vflag_global) {
+    for (i = 0; i < 6; i++) virial[i] = 0.0;
+    for (i = 0; i < 3; i++)
+      for (j = 0; j < 3; j++)
+        for (k = 0; k < 3; k++)
+          for (l = 0; l < 3; l++)
+	    virial2[i][j][k][l] = 0.0;
+  }
   if (eflag_atom) {
     n = atom->nlocal;
     for (i = 0; i < n; i++) eatom[i] = 0.0;
@@ -240,7 +250,7 @@ void Fix::ev_setup(int eflag, int vflag)
 
 void Fix::v_setup(int vflag)
 {
-  int i,n;
+  int i,j,k,l,n;
 
   if (!thermo_virial) {
     evflag = 0;
@@ -252,8 +262,6 @@ void Fix::v_setup(int vflag)
   vflag_global = vflag % 4;
   vflag_atom = vflag / 4;
 
-  memory->create(virial2,6,6,"fix:virial2");
-
   // reallocate per-atom array if necessary
 
   if (vflag_atom && atom->nlocal > maxvatom) {
@@ -264,7 +272,14 @@ void Fix::v_setup(int vflag)
 
   // zero accumulators
 
-  if (vflag_global) for (i = 0; i < 6; i++) virial[i] = 0.0;
+  if (vflag_global) {
+    for (i = 0; i < 6; i++) virial[i] = 0.0;
+    for (i = 0; i < 3; i++)
+      for (j = 0; j < 3; j++)
+        for (k = 0; k < 3; k++)
+	  for (l = 0; l < 3; l++)
+	    virial2[i][j][k][l] = 0.0;
+  }
   if (vflag_atom) {
     n = atom->nlocal;
     for (i = 0; i < n; i++) {

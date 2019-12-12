@@ -142,7 +142,7 @@ void ComputeElastic::init()
   }
 
   // detect contributions to virial
-  // v2ptr points to all virial2[6][6] contributions
+  // v2ptr points to all ****virial2 contributions
 
   delete [] v2ptr;
   nvirial = 0;
@@ -158,7 +158,7 @@ void ComputeElastic::init()
       if (modify->fix[i]->thermo_virial) nvirial++;
 
   if (nvirial) {
-    v2ptr = new double**[nvirial];
+    v2ptr = new double****[nvirial];
     nvirial = 0;
     if (pairflag && force->pair) v2ptr[nvirial++] = force->pair->virial2;
     if (bondflag && force->bond) v2ptr[nvirial++] = force->bond->virial2;
@@ -191,10 +191,47 @@ void ComputeElastic::compute_array()
     pressure_tensor = pressure->vector;
   }
 
-  // compute stiffness tensor in Voigt notation
+  // compute symmetrised stiffness tensor
   
-  double e[6][6];
-  int i,j,k,l,m,n,p,delta;
+  int i,j,k,l,m,n,p;
+  int d1,d2,d3,d4;
+  double c[3][3][3][3];
+  double inv_volume = 1.0 / (domain->xprd * domain->yprd * domain->zprd);
+  for (i = 0; i < 3; i++)
+    for (j = 0; j < 3; j++)
+      for (k = 0; k < 3; k++)
+        for (l = 0; l < 3; l++) {
+         
+	  // second order virial contribution
+
+          c[i][j][k][l] = inv_volume * nktv2p * (
+	      virial2[i][j][k][l] + virial2[j][i][k][l]
+	    + virial2[i][j][l][k] + virial2[j][i][l][k]);
+	  
+	  // pressure tensor contribution
+	  
+	  if (j == l) {
+	    p = pressure_index(i,k);
+	    c[i][j][k][l] += pressure_tensor[p];
+	  }
+	  if (i == l) {
+	    p = pressure_index(j,k);
+	    c[i][j][k][l] += pressure_tensor[p];
+	  }
+	  if (j == k) {
+            p = pressure_index(i,l);
+	    c[i][j][k][l] += pressure_tensor[p];
+	  }
+	  if (i == k) {
+            p = pressure_index(j,l);
+	    c[i][j][k][l] += pressure_tensor[p];
+	  }
+
+	  c[i][j][k][l] *= 0.25;
+	}
+
+  // transform to Voigt notation
+
   for (i = 0; i < 6; i++) {
     if (i == 0) {
       k = 0;
@@ -246,30 +283,8 @@ void ComputeElastic::compute_array()
         n = 1;
       }
 
-      if (l == n) delta = 1;
-      else delta = 0;
-
-      if (k == 0) {
-        if (m == 0) p = 0;
-	else if (m == 1) p = 3;
-	else p = 4;
-      }
-      else if (k == 1) {
-        if (m == 0) p = 3;
-	else if (m == 1) p = 1;
-	else p = 5;
-      }
-      else {
-        if (m == 0) p = 4;
-	else if (m == 1) p = 5;
-	else p = 3;
-      }
-
-      inv_volume = 1.0 / (domain->xprd * domain->yprd * domain->zprd);
-      e[i][j] = virial2[i][j]*inv_volume*nktv2p 
-	      + delta*pressure_tensor[p];
+      array[i][j] = c[k][l][m][n];
     }
-
   }
 }
 
@@ -277,25 +292,54 @@ void ComputeElastic::compute_array()
 
 void ComputeElastic::virial_compute()
 {
-  int i,j,k;
-  double v2[6][6],**v2component;
+  int i,j,k,l,m;
+  double v2[3][3][3][3],****v2component;
 
-  for (i = 0; i < 6; i++) 
-    for (j = 0; j < 6; j++)
-	  v2[i][j] = 0.0;
+  for (i = 0; i < 3; i++) 
+    for (j = 0; j < 3; j++)
+      for (k = 0; k < 3; k++)
+        for (l = 0; l < 3; l++)
+	  v2[i][j][k][l] = 0.0;
 
   // sum contributions to virial from forces and fixes
 
-  for (k = 0; k < nvirial; k++) {
+  for (m = 0; m < nvirial; m++) {
     v2component = v2ptr[k];
-    for (i = 0; i < 6; i++)
-      for (j = 0; j < 6; j++) v2[i][j] += v2component[i][j];
+    for (i = 0; i < 3; i++)
+      for (j = 0; j < 3; j++)
+        for (k = 0; k < 3; k++)
+          for (l = 0; l < 3; l++)
+	    v2[i][j][k][l] += v2component[i][j][k][l];
   }
 
   // sum virial across procs
 
-  for (i = 0; i < 6; i++)
-    MPI_Allreduce(v2[i],virial2[i],6,MPI_DOUBLE,MPI_SUM,world);
+  for (i = 0; i < 3; i++)
+    for (j = 0; j < 3; j++)
+      for (k = 0; k < 3; k++)
+        MPI_Allreduce(
+	  v2[i][j][k],virial2[i][j][k],3,MPI_DOUBLE,MPI_SUM,world);
+}
+
+/* ---------------------------------------------------------------------- */
+
+int ComputeElastic::pressure_index(int i, int j)
+{
+  if (i == 0) {
+    if (j == 0) return 0;
+    else if (j == 1) return 3;
+    else return 4;
+  }
+  else if (i == 1) {
+    if (j == 0) return 3;
+    else if (j == 1) return 1;
+    else return 5;
+  }
+  else {
+    if (j == 0) return 4;
+    else if (j == 1) return 5;
+    else return 2;
+  }
 }
 
 /* ---------------------------------------------------------------------- */

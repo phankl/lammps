@@ -38,6 +38,10 @@ Improper::Improper(LAMMPS *lmp) : Pointers(lmp)
   vatom = NULL;
   setflag = NULL;
 
+  // global second-order virial
+
+  memory->create(virial2,3,3,3,3,"improper:virial2");
+
   execution_space = Host;
   datamask_read = ALL_MASK;
   datamask_modify = ALL_MASK;
@@ -77,7 +81,7 @@ void Improper::init()
 
 void Improper::ev_setup(int eflag, int vflag, int alloc)
 {
-  int i,n;
+  int i,j,k,l,n;
 
   evflag = 1;
 
@@ -88,8 +92,6 @@ void Improper::ev_setup(int eflag, int vflag, int alloc)
   vflag_either = vflag;
   vflag_global = vflag % 4;
   vflag_atom = vflag / 4;
-
-  memory->create(virial2,6,6,"improper:virial2");
 
   // reallocate per-atom arrays if necessary
 
@@ -111,7 +113,14 @@ void Improper::ev_setup(int eflag, int vflag, int alloc)
   // zero accumulators
 
   if (eflag_global) energy = 0.0;
-  if (vflag_global) for (i = 0; i < 6; i++) virial[i] = 0.0;
+  if (vflag_global) { 
+    for (i = 0; i < 6; i++) virial[i] = 0.0;
+    for (i = 0; i < 3; i++)  
+      for (j = 0; j < 3; j++) 
+        for (k = 0; k < 3; k++)
+          for (l = 0; l < 3; l++)
+            virial2[i][j][k][l] = 0.0;
+  }
   if (eflag_atom && alloc) {
     n = atom->nlocal;
     if (force->newton_bond) n += atom->nghost;
