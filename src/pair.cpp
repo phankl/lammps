@@ -1571,6 +1571,52 @@ void Pair::virial_fdotr_compute()
 }
 
 /* ----------------------------------------------------------------------
+   tally virial2 into global accumulator
+   need i < nlocal test since called by bond_quartic and dihedral_charmm
+------------------------------------------------------------------------- */
+
+void Pair::v2_tally(int i, int j, int nlocal, int newton_pair,
+		    double fpair, double gpair, double rsq,
+		    double delx, double dely, double delz)
+{
+  double rsq_inv = 1.0 / rsq;
+ 
+  double del[3] = {delx, dely, delz};
+
+  int k,l,m,n;
+  double tetrad;
+
+  if (vflag_global) {
+    if (newton_pair)
+      for (k = 0; k < 3; k++)
+        for (l = 0; l < 3; l++)
+          for (m = 0; m < 3; m++)
+	    for (n = 0; n < 3; n++) {
+              tetrad = del[k] * del[l] * del[m] * del[n];
+	      virial2[k][l][m][n] += tetrad*rsq_inv*(gpair + fpair);
+	    }
+    else {
+      if (i < nlocal)
+        for (k = 0; k < 3; k++)
+          for (l = 0; l < 3; l++)
+            for (m = 0; m < 3; m++)
+	      for (n = 0; n < 3; n++) {
+                tetrad = del[k] * del[l] * del[m] * del[n];
+	        virial2[k][l][m][n] += 0.5*tetrad*rsq_inv*(gpair + fpair);
+	      }
+      if (j < nlocal)
+        for (k = 0; k < 3; k++)
+          for (l = 0; l < 3; l++)
+            for (m = 0; m < 3; m++)
+	      for (n = 0; n < 3; n++) {
+                tetrad = del[k] * del[l] * del[m] * del[n];
+	        virial2[k][l][m][n] += 0.5*tetrad*rsq_inv*(gpair + fpair);
+	      }
+    }
+  }
+}
+
+/* ----------------------------------------------------------------------
    write a table of pair potential energy/force vs distance to a file
 ------------------------------------------------------------------------- */
 

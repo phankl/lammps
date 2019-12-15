@@ -229,6 +229,52 @@ void Bond::ev_tally(int i, int j, int nlocal, int newton_bond,
 }
 
 /* ----------------------------------------------------------------------
+   tally energy and virial into global and per-atom accumulators
+------------------------------------------------------------------------- */
+
+void Bond::v2_tally(int i, int j, int nlocal, int newton_bond,
+		    double fbond, double gbond, double rsq,
+		    double delx, double dely, double delz)
+{
+  double rsq_inv = 1.0 / rsq;
+ 
+  double del[3] = {delx, dely, delz};
+
+  int k,l,m,n;
+  double tetrad;
+
+  if (vflag_global) {
+    if (newton_bond)
+      for (k = 0; k < 3; k++)
+        for (l = 0; l < 3; l++)
+          for (m = 0; m < 3; m++)
+	    for (n = 0; n < 3; n++) {
+              tetrad = del[k] * del[l] * del[m] * del[n];
+	      virial2[k][l][m][n] += tetrad*rsq_inv*(gbond + fbond);
+	    }
+    else {
+      if (i < nlocal)
+        for (k = 0; k < 3; k++)
+          for (l = 0; l < 3; l++)
+            for (m = 0; m < 3; m++)
+	      for (n = 0; n < 3; n++) {
+                tetrad = del[k] * del[l] * del[m] * del[n];
+	        virial2[k][l][m][n] += 0.5*tetrad*rsq_inv*(gbond + fbond);
+	      }
+      if (j < nlocal)
+        for (k = 0; k < 3; k++)
+          for (l = 0; l < 3; l++)
+            for (m = 0; m < 3; m++)
+	      for (n = 0; n < 3; n++) {
+                tetrad = del[k] * del[l] * del[m] * del[n];
+	        virial2[k][l][m][n] += 0.5*tetrad*rsq_inv*(gbond + fbond);
+	      }
+    }
+  }
+}
+
+
+/* ----------------------------------------------------------------------
    write a table of bond potential energy/force vs distance to a file
 ------------------------------------------------------------------------- */
 

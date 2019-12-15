@@ -35,7 +35,7 @@ class Pair : protected Pointers {
 
   double eng_vdwl,eng_coul;      // accumulated energies
   double virial[6];              // accumulated virial
-  double **virial2;              // accumulated second order virial
+  double ****virial2;            // accumulated second order virial
   double *eatom,**vatom;         // accumulated per-atom energy/virial
 
   double cutforce;               // max cutoff for all atom pairs
@@ -122,6 +122,8 @@ class Pair : protected Pointers {
   // need to be public, so can be called by pair_style reaxc
 
   void v_tally(int, double *, double *);
+  void v2_tally(int, int, int, int, double, double, double,
+		double, double, double);
   void ev_tally(int, int, int, int, double, double, double,
                 double, double, double);
   void ev_tally3(int, int, int, double, double,
