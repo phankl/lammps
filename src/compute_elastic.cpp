@@ -200,52 +200,42 @@ void ComputeElastic::compute_array()
 
   virial_compute();
 
-  // compute symmetrised stiffness tensor
+  // compute symmetrised stiffness tensor in Voigt notation
   
   int i,j,k,l,m,n,p;
-  int d1,d2,d3,d4;
-  double c[3][3][3][3];
   double inv_volume = 1.0 / (domain->xprd * domain->yprd * domain->zprd);
-  for (i = 0; i < 3; i++)
-    for (j = 0; j < 3; j++)
-      for (k = 0; k < 3; k++)
-        for (l = 0; l < 3; l++) {
-         
-          // second order virial contribution
-
-          c[i][j][k][l] = inv_volume * nktv2p * (
-              virial2[i][j][k][l] + virial2[j][i][k][l]
-            + virial2[i][j][l][k] + virial2[j][i][l][k]);
-          
-          // pressure tensor contribution
-          
-          if (j == l) {
-            p = pressure_index(i,k);
-            c[i][j][k][l] += pressure_tensor[p];
-          }
-          if (i == l) {
-            p = pressure_index(j,k);
-            c[i][j][k][l] += pressure_tensor[p];
-          }
-          if (j == k) {
-            p = pressure_index(i,l);
-            c[i][j][k][l] += pressure_tensor[p];
-          }
-          if (i == k) {
-            p = pressure_index(j,l);
-            c[i][j][k][l] += pressure_tensor[p];
-          }
-          
-          c[i][j][k][l] *= 0.25;
-        }
-
-  // transform to Voigt notation
 
   for (i = 0; i < 6; i++) {
     voigt_index(i,k,l);
     for (j = 0; j < 6; j++) {
       voigt_index(j,m,n);
-      array[i][j] = c[k][l][m][n];
+      
+      // second order virial contribution
+      
+      array[i][j] = inv_volume * nktv2p * (
+          virial2[k][l][m][n] + virial2[l][k][m][n]
+        + virial2[k][l][n][m] + virial2[l][k][n][m]);
+
+      // pressure tensor contribution
+      
+      if (l == n) {
+        p = pressure_index(k,m);
+        array[i][j] += pressure_tensor[p];
+      }
+      if (k == n) {
+        p = pressure_index(l,m);
+        array[i][j] += pressure_tensor[p];
+      }
+      if (l == m) {
+        p = pressure_index(k,n);
+        array[i][j] += pressure_tensor[p];
+      }
+      if (k == m) {
+        p = pressure_index(l,n);
+        array[i][j] += pressure_tensor[p];
+      }
+
+      array[i][j] *= 0.25;
     }
   }
 }
