@@ -70,6 +70,7 @@ void PairLJCut::compute(int eflag, int vflag)
   int i,j,ii,jj,inum,jnum,itype,jtype;
   double xtmp,ytmp,ztmp,delx,dely,delz,evdwl,fpair;
   double rsq,r2inv,r6inv,forcelj,factor_lj;
+  double gradlj,gpair;
   int *ilist,*jlist,*numneigh,**firstneigh;
 
   evdwl = 0.0;
@@ -133,6 +134,13 @@ void PairLJCut::compute(int eflag, int vflag)
 
         if (evflag) ev_tally(i,j,nlocal,newton_pair,
                              evdwl,0.0,fpair,delx,dely,delz);
+        
+	      if (vflag) {
+          gradlj = r6inv*(156.0*lj3[itype][jtype]*r6inv 
+			           - 42.0*lj4[itype][jtype]);
+	        gpair = factor_lj*gradlj*r2inv;
+	        v2_tally(i,j,nlocal,newton_pair,fpair,gpair,rsq,delx,dely,delz);
+	      }
       }
     }
   }
