@@ -811,8 +811,8 @@ void Pair::ev_setup(int eflag, int vflag, int alloc)
     for (i = 0; i < 3; i++)
       for (j = 0; j < 3; j++)
         for (k = 0; k < 3; k++)
-	  for (l = 0; l < 3; l++)
-	    virial2[i][j][k][l] = 0.0;
+	        for (l = 0; l < 3; l++)
+	          virial2[i][j][k][l] = 0.0;
   }
   if (eflag_atom && alloc) {
     n = atom->nlocal;
@@ -1584,35 +1584,39 @@ void Pair::v2_tally(int i, int j, int nlocal, int newton_pair,
   double del[3] = {delx, dely, delz};
 
   int k,l,m,n;
-  double tetrad;
-
-  if (vflag_global) {
-    if (newton_pair)
+  double dyad,tetrad;
+  
+  if (newton_pair)
+    for (k = 0; k < 3; k++)
+      for (l = 0; l < 3; l++)
+        for (m = 0; m < 3; m++)
+          for (n = 0; n < 3; n++) {
+            dyad = del[l] * del[n];
+            tetrad = dyad * del[k] * del[m];
+            virial2[k][l][m][n] += tetrad*rsq_inv*(gpair + fpair);
+            if (k == m) virial2[k][l][m][n] -= dyad*fpair;
+          }
+  else {
+    if (i < nlocal)
       for (k = 0; k < 3; k++)
         for (l = 0; l < 3; l++)
           for (m = 0; m < 3; m++)
-	    for (n = 0; n < 3; n++) {
-              tetrad = del[k] * del[l] * del[m] * del[n];
-	      virial2[k][l][m][n] += tetrad*rsq_inv*(gpair + fpair);
-	    }
-    else {
-      if (i < nlocal)
-        for (k = 0; k < 3; k++)
-          for (l = 0; l < 3; l++)
-            for (m = 0; m < 3; m++)
-	      for (n = 0; n < 3; n++) {
-                tetrad = del[k] * del[l] * del[m] * del[n];
-	        virial2[k][l][m][n] += 0.5*tetrad*rsq_inv*(gpair + fpair);
-	      }
-      if (j < nlocal)
-        for (k = 0; k < 3; k++)
-          for (l = 0; l < 3; l++)
-            for (m = 0; m < 3; m++)
-	      for (n = 0; n < 3; n++) {
-                tetrad = del[k] * del[l] * del[m] * del[n];
-	        virial2[k][l][m][n] += 0.5*tetrad*rsq_inv*(gpair + fpair);
-	      }
-    }
+            for (n = 0; n < 3; n++) {
+              dyad = del[l] * del[n];
+              tetrad = dyad * del[k] * del[m];
+              virial2[k][l][m][n] += 0.5*tetrad*rsq_inv*(gpair + fpair);
+              if (k == m) virial2[k][l][m][n] -= 0.5*dyad*fpair;
+            }
+    if (j < nlocal)
+      for (k = 0; k < 3; k++)
+        for (l = 0; l < 3; l++)
+          for (m = 0; m < 3; m++)
+            for (n = 0; n < 3; n++) {
+              dyad = del[l] * del[n];
+              tetrad = dyad * del[k] * del[m];
+              virial2[k][l][m][n] += 0.5*tetrad*rsq_inv*(gpair + fpair);
+              if (k == m) virial2[k][l][m][n] -= 0.5*dyad*fpair;
+            }
   }
 }
 

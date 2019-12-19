@@ -28,6 +28,7 @@
 #include "improper.h"
 #include "kspace.h"
 #include "error.h"
+#include "memory.h"
 
 using namespace LAMMPS_NS;
 
@@ -71,6 +72,7 @@ ComputeElastic::ComputeElastic(LAMMPS *lmp, int narg, char **arg) :
     pairflag = 1;
     bondflag = angleflag = dihedralflag = improperflag = 1;
     fixflag = 1;
+    kspaceflag = 0;
   } else {
     pressureflag = 0;
     pairflag = 0;
@@ -89,8 +91,9 @@ ComputeElastic::ComputeElastic(LAMMPS *lmp, int narg, char **arg) :
       else if (strcmp(arg[iarg],"virial") == 0) {
         pairflag = 1;
         bondflag = angleflag = dihedralflag = improperflag = 1;
-	fixflag = 1;
-      } else error->all(FLERR,"Illegal compute elastic command");
+	      fixflag = 1;
+      } 
+      else error->all(FLERR,"Illegal compute elastic command");
       iarg++;
     }
   }
@@ -105,6 +108,7 @@ ComputeElastic::ComputeElastic(LAMMPS *lmp, int narg, char **arg) :
     error->all(FLERR,"Compute elastic requires pressure ID "
                "to include pressure tensor");
 
+  memory->create(virial2,3,3,3,3,"compute:virial2");
   array = new double*[6];
   for (int i = 0; i < 6; i++)
     array[i] = new double[6];
@@ -116,6 +120,8 @@ ComputeElastic::ComputeElastic(LAMMPS *lmp, int narg, char **arg) :
 
 ComputeElastic::~ComputeElastic()
 {
+  memory->destroy(virial2);
+
   delete [] id_press;
   for (int i = 0; i < 6; i++)
     delete [] array[i];
@@ -127,11 +133,10 @@ ComputeElastic::~ComputeElastic()
 
 void ComputeElastic::init()
 {
-  boltz = force->boltz;
   nktv2p = force->nktv2p;
   dimension = domain->dimension;
 
-  // set temperature compute, must be done in init()
+  // set pressure compute, must be done in init()
   // fixes could have changed or compute_modify could have changed it
 
   if (pressureflag) {
@@ -182,6 +187,8 @@ void ComputeElastic::init()
 
 void ComputeElastic::compute_array()
 {
+  invoked_array = update->ntimestep;
+
   // invoke pressure if it hasn't been already
 
   double *pressure_tensor;
@@ -190,6 +197,8 @@ void ComputeElastic::compute_array()
       pressure->compute_vector();
     pressure_tensor = pressure->vector;
   }
+
+  virial_compute();
 
   // compute symmetrised stiffness tensor
   
@@ -202,87 +211,40 @@ void ComputeElastic::compute_array()
       for (k = 0; k < 3; k++)
         for (l = 0; l < 3; l++) {
          
-	  // second order virial contribution
+          // second order virial contribution
 
           c[i][j][k][l] = inv_volume * nktv2p * (
-	      virial2[i][j][k][l] + virial2[j][i][k][l]
-	    + virial2[i][j][l][k] + virial2[j][i][l][k]);
-	  
-	  // pressure tensor contribution
-	  
-	  if (j == l) {
-	    p = pressure_index(i,k);
-	    c[i][j][k][l] += pressure_tensor[p];
-	  }
-	  if (i == l) {
-	    p = pressure_index(j,k);
-	    c[i][j][k][l] += pressure_tensor[p];
-	  }
-	  if (j == k) {
+              virial2[i][j][k][l] + virial2[j][i][k][l]
+            + virial2[i][j][l][k] + virial2[j][i][l][k]);
+          
+          // pressure tensor contribution
+          
+          if (j == l) {
+            p = pressure_index(i,k);
+            c[i][j][k][l] += pressure_tensor[p];
+          }
+          if (i == l) {
+            p = pressure_index(j,k);
+            c[i][j][k][l] += pressure_tensor[p];
+          }
+          if (j == k) {
             p = pressure_index(i,l);
-	    c[i][j][k][l] += pressure_tensor[p];
-	  }
-	  if (i == k) {
+            c[i][j][k][l] += pressure_tensor[p];
+          }
+          if (i == k) {
             p = pressure_index(j,l);
-	    c[i][j][k][l] += pressure_tensor[p];
-	  }
-
-	  c[i][j][k][l] *= 0.25;
-	}
+            c[i][j][k][l] += pressure_tensor[p];
+          }
+          
+          c[i][j][k][l] *= 0.25;
+        }
 
   // transform to Voigt notation
 
   for (i = 0; i < 6; i++) {
-    if (i == 0) {
-      k = 0;
-      l = 0;
-    }
-    else if (i == 1) {
-      k = 1;
-      l = 1;
-    }
-    else if (i == 2) {
-      k = 2;
-      l = 2;
-    }
-    else if (i == 3) {
-      k = 1;
-      l = 2;
-    }
-    else if (i == 4) {
-      k = 0;
-      l = 2;
-    }
-    else {
-      k = 0;
-      l = 1;
-    }
+    voigt_index(i,k,l);
     for (j = 0; j < 6; j++) {
-      if (j == 0) {
-        m = 0;
-        n = 0;
-      }
-      else if (j == 1) {
-        m = 1;
-        n = 1;
-      }
-      else if (j == 2) {
-        m = 2;
-        n = 2;
-      }
-      else if (j == 3) {
-        m = 1;
-        n = 2;
-      }
-      else if (j == 4) {
-        m = 0;
-        n = 2;
-      }
-      else {
-        m = 0;
-        n = 1;
-      }
-
+      voigt_index(j,m,n);
       array[i][j] = c[k][l][m][n];
     }
   }
@@ -299,17 +261,17 @@ void ComputeElastic::virial_compute()
     for (j = 0; j < 3; j++)
       for (k = 0; k < 3; k++)
         for (l = 0; l < 3; l++)
-	  v2[i][j][k][l] = 0.0;
-
+	        v2[i][j][k][l] = 0.0;
+  
   // sum contributions to virial from forces and fixes
 
   for (m = 0; m < nvirial; m++) {
-    v2component = v2ptr[k];
+    v2component = v2ptr[m];
     for (i = 0; i < 3; i++)
       for (j = 0; j < 3; j++)
         for (k = 0; k < 3; k++)
           for (l = 0; l < 3; l++)
-	    v2[i][j][k][l] += v2component[i][j][k][l];
+	          v2[i][j][k][l] += v2component[i][j][k][l];
   }
 
   // sum virial across procs
@@ -318,7 +280,37 @@ void ComputeElastic::virial_compute()
     for (j = 0; j < 3; j++)
       for (k = 0; k < 3; k++)
         MPI_Allreduce(
-	  v2[i][j][k],virial2[i][j][k],3,MPI_DOUBLE,MPI_SUM,world);
+	        v2[i][j][k],virial2[i][j][k],3,MPI_DOUBLE,MPI_SUM,world);
+}
+
+/* ---------------------------------------------------------------------- */
+
+void ComputeElastic::voigt_index(int i, int &j, int &k)
+{
+  if (i == 0) {
+    j = 0;
+    k = 0;
+  }
+  else if (i == 1) {
+    j = 1;
+    k = 1;
+  }
+  else if (i == 2) {
+    j = 2;
+    k = 2;
+  }
+  else if (i == 3) {
+    j = 1;
+    k = 2;
+  }
+  else if (i == 4) {
+    j = 0;
+    k = 2;
+  }
+  else {
+    j = 0;
+    k = 1;
+  }
 }
 
 /* ---------------------------------------------------------------------- */
