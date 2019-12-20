@@ -245,6 +245,64 @@ void Angle::ev_tally(int i, int j, int k, int nlocal, int newton_bond,
   }
 }
 
+/* ----------------------------------------------------------------------
+   tally virial2 into global accumulator
+------------------------------------------------------------------------- */
+
+void Angle::v2_tally(int i, int j, int k, int nlocal, int newton_bond,
+                     double v11[3][3], double v13[3][3], double v33[3][3],
+                     double delx1, double dely1, double delz1,
+                     double delx2, double dely2, double delz2)
+{
+  double del12[3] = {delx1,dely1,delz1};
+  double del23[3] = {delx2,dely2,delz2};
+
+  int m,n,p,q;
+  
+  if (vflag_global) {
+    if (newton_bond)
+      for (m = 0; m < 3; m++)
+        for (n = 0; n < 3; n++)
+          for (p = 0; p < 3; p++)
+	    for (q = 0; q < 3; q++)
+	      virial2[m][n][p][q] =+ del12[n]*del12[q]*v11[m][p]
+                                   + del12[n]*del23[q]*v13[m][p]
+                                   + del23[n]*del12[q]*v13[p][m]
+		                   + del23[n]*del23[q]*v33[m][p];
+    else {
+      if (i < nlocal)
+        for (m = 0; m < 3; m++)
+          for (n = 0; n < 3; n++)
+            for (p = 0; p < 3; p++)
+	      for (q = 0; q < 3; q++)
+	        virial2[m][n][p][q] =+ THIRD*(
+			               del12[n]*del12[q]*v11[m][p]
+                                     + del12[n]*del23[q]*v13[m][p]
+                                     + del23[n]*del12[q]*v13[p][m]
+		                     + del23[n]*del23[q]*v33[m][p]);
+      if (j < nlocal)
+        for (m = 0; m < 3; m++)
+          for (n = 0; n < 3; n++)
+            for (p = 0; p < 3; p++)
+	      for (q = 0; q < 3; q++)
+	        virial2[m][n][p][q] =+ THIRD*(
+			               del12[n]*del12[q]*v11[m][p]
+                                     + del12[n]*del23[q]*v13[m][p]
+                                     + del23[n]*del12[q]*v13[p][m]
+		                     + del23[n]*del23[q]*v33[m][p]);
+      if (k < nlocal)
+        for (m = 0; m < 3; m++)
+          for (n = 0; n < 3; n++)
+            for (p = 0; p < 3; p++)
+	      for (q = 0; q < 3; q++)
+	        virial2[m][n][p][q] =+ THIRD*(
+			               del12[n]*del12[q]*v11[m][p]
+                                     + del12[n]*del23[q]*v13[m][p]
+                                     + del23[n]*del12[q]*v13[p][m]
+		                     + del23[n]*del23[q]*v33[m][p]);
+    }
+  }
+}
 /* ---------------------------------------------------------------------- */
 
 double Angle::memory_usage()
