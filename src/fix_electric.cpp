@@ -36,13 +36,13 @@ using namespace MathExtra;
 FixElectric::FixElectric(LAMMPS *lmp, int narg, char **arg) :
   Fix(lmp, narg, arg)
 {
-  if (narg != 5) error->all(FLERR,"Illegal fix electric command");
+  if (narg != 8) error->all(FLERR,"Illegal fix electric command");
 
-  n = force->numeric(arg[0],0,NULL);
-  k = force->numeric(arg[1],0,NULL);
-  evec[0] = force->numeric(arg[2],0,NULL);
-  evec[1] = force->numeric(arg[3],0,NULL);
-  evec[2] = force->numeric(arg[4],0,NULL);
+  n = force->numeric(NULL,0,arg[3]);
+  k = force->numeric(NULL,0,arg[4]);
+  evec[0] = force->numeric(NULL,0,arg[5]);
+  evec[1] = force->numeric(NULL,0,arg[6]);
+  evec[2] = force->numeric(NULL,0,arg[7]);
 
   eflag = 0;
   ee = 0.0;
@@ -108,10 +108,10 @@ void FixElectric::post_force(int /*vflag*/)
     double dd = dot3(delta,delta);
 
     double f1[3] = {0.0,0.0,0.0};
-    scaleadd3(dd,evec,f1,f1);
-    scaleadd3(-de,delta,f1,f1);
+    scaleadd3(dd*n,evec,f1,f1);
+    scaleadd3(de*(n-1),delta,f1,f1);
 
-    double a = k * n * pow(dd,-1.0-n/2.0) * pow(de,n-1);
+    double a = -k * pow(de,n-1) / pow(dd,0.5*(n+1));
     scale3(a,f1);
 
     if (newton_bond || i1 < nlocal) add3(f1,f[i1],f[i1]);
