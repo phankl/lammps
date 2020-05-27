@@ -440,6 +440,12 @@ void ReadData::command(int narg, char **arg)
 
       atom->allocate_type_arrays();
       atom->deallocate_topology();
+
+      // allocate atom arrays to N, rounded up by AtomVec->DELTA
+
+      bigint nbig = n;
+      nbig = atom->avec->roundup(nbig);
+      n = static_cast<int> (nbig);
       atom->avec->grow(n);
 
       domain->boxlo[0] = boxlo[0]; domain->boxhi[0] = boxhi[0];
@@ -568,7 +574,7 @@ void ReadData::command(int narg, char **arg)
         if (!avec_body)
           error->all(FLERR,"Invalid data file section: Bodies");
         if (atomflag == 0) error->all(FLERR,"Must read Atoms before Bodies");
-        bodies(firstpass);
+        bodies(firstpass,(AtomVec *) avec_body);
 
       } else if (strcmp(keyword,"Masses") == 0) {
         if (firstpass) mass();
@@ -1686,7 +1692,7 @@ void ReadData::bonus(bigint nbonus, AtomVec *ptr, const char *type)
    if not firstpass, just read past data, but no processing of data
 ------------------------------------------------------------------------- */
 
-void ReadData::bodies(int firstpass)
+void ReadData::bodies(int firstpass, AtomVec *ptr)
 {
   int m,nchunk,nline,nmax,ninteger,ndouble,nword,ncount,onebody,tmp,rv;
   char *eof;
@@ -1770,7 +1776,7 @@ void ReadData::bodies(int firstpass)
     MPI_Bcast(&m,1,MPI_INT,0,world);
     MPI_Bcast(buffer,m,MPI_CHAR,0,world);
 
-    if (firstpass) atom->data_bodies(nchunk,buffer,avec_body,id_offset);
+    if (firstpass) atom->data_bodies(nchunk,buffer,ptr,id_offset);
     nread += nchunk;
   }
 
