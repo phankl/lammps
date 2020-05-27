@@ -35,7 +35,6 @@ class FixElectric : public Fix {
   virtual void post_force(int);
 
  protected:
-  int n;
   double k;
   double evec[3];
 

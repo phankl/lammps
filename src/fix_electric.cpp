@@ -36,13 +36,15 @@ using namespace MathExtra;
 FixElectric::FixElectric(LAMMPS *lmp, int narg, char **arg) :
   Fix(lmp, narg, arg)
 {
-  if (narg != 8) error->all(FLERR,"Illegal fix electric command");
+  
+  if (narg != 7) error->all(FLERR,"Illegal fix electric command");
 
-  n = force->numeric(NULL,0,arg[3]);
-  k = force->numeric(NULL,0,arg[4]);
-  evec[0] = force->numeric(NULL,0,arg[5]);
-  evec[1] = force->numeric(NULL,0,arg[6]);
-  evec[2] = force->numeric(NULL,0,arg[7]);
+  k = force->numeric(FLERR,arg[3]);
+  evec[0] = force->numeric(FLERR,arg[4]);
+  evec[1] = force->numeric(FLERR,arg[5]);
+  evec[2] = force->numeric(FLERR,arg[6]);
+
+  printf("Parameters: %e %e %e %e\n",k,evec[0],evec[1],evec[2]);
 
   eflag = 0;
   ee = 0.0;
@@ -81,7 +83,7 @@ void FixElectric::setup(int vflag)
 
 void FixElectric::post_force(int /*vflag*/)
 {
-  // apply electric force to each particle
+  // apply electric force to each bond
 
   double **x = atom->x;
   double **f = atom->f;
@@ -103,18 +105,19 @@ void FixElectric::post_force(int /*vflag*/)
 
     double delta[3];
     sub3(x2,x1,delta);
+    normalize3(delta,delta);
     
     double de = dot3(delta,evec);
-    double dd = dot3(delta,delta);
+    
+    double f1[3];
+    double f2[3];
+    copy3(evec,f1);
+    copy3(delta,f2);
+    scale3(-2.0*k*de,f1);
+    scaleadd3(k*de*de,f2,f1,f1);
 
-    double f1[3] = {0.0,0.0,0.0};
-    scaleadd3(dd*n,evec,f1,f1);
-    scaleadd3(de*(n-1),delta,f1,f1);
-
-    double a = -k * pow(de,n-1) / pow(dd,0.5*(n+1));
-    scale3(a,f1);
-
-    if (newton_bond || i1 < nlocal) add3(f1,f[i1],f[i1]);
-    if (newton_bond || i2 < nlocal) sub3(f[i2],f1,f[i2]);
+    if (mask[i1] & groupbit) add3(f1,f[i1],f[i1]);
+    if (mask[i2] & groupbit) sub3(f[i2],f1,f[i2]);  
   }
 }
+
