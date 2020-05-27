@@ -44,8 +44,6 @@ FixElectric::FixElectric(LAMMPS *lmp, int narg, char **arg) :
   evec[1] = force->numeric(FLERR,arg[5]);
   evec[2] = force->numeric(FLERR,arg[6]);
 
-  printf("Parameters: %e %e %e %e\n",k,evec[0],evec[1],evec[2]);
-
   eflag = 0;
   ee = 0.0;
 }
@@ -70,6 +68,8 @@ int FixElectric::setmask()
 
 void FixElectric::init()
 {
+  if (force->newton_bond)
+    error->all(FLERR,"Fix electric requires newton bond off");
 }
 
 /* ---------------------------------------------------------------------- */
@@ -116,8 +116,16 @@ void FixElectric::post_force(int /*vflag*/)
     scale3(-2.0*k*de,f1);
     scaleadd3(k*de*de,f2,f1,f1);
 
-    if (mask[i1] & groupbit) add3(f1,f[i1],f[i1]);
-    if (mask[i2] & groupbit) sub3(f[i2],f1,f[i2]);  
+    if (mask[i1] & groupbit) {
+      f[i1][0] += f1[0];
+      f[i1][1] += f1[1];
+      f[i1][2] += f1[2];
+    }
+    if (mask[i2] & groupbit) {
+      f[i2][0] -= f1[0];
+      f[i2][1] -= f1[1];
+      f[i2][2] -= f1[2];
+    }  
   }
 }
 
